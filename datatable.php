@@ -78,7 +78,7 @@ if (! function_exists('process_datatable')) {
                     $data = $data->whereBetween($field, $date_values);
                 }
                 elseif($attributes['type'] == 'select'){
-                    $data = $data->where($field, 'LIKE', "%${value}%");
+                    $data = $data->where($field, "${value}");
                 }
             }
         }
