@@ -1,5 +1,4 @@
 <?php
-// error_reporting(E_ALL);
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -72,11 +71,14 @@ if (! function_exists('process_datatable')) {
                     
                 if ($attributes['type'] == 'text') {
                     $data = $data->where($field, 'LIKE', "%${value}%");
-                } elseif ($attributes['type'] == 'date') {
+                } elseif ($attributes['type'] == 'between') {
                     $date_values = explode('&', $value);
                     $date_values[0] .= " 00:00:00";
                     $date_values[1] .= " 23:59:59";
                     $data = $data->whereBetween($field, $date_values);
+                }
+                elseif($attributes['type'] == 'select'){
+                    $data = $data->where($field, 'LIKE', "%${value}%");
                 }
             }
         }
