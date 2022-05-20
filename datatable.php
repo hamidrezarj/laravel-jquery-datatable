@@ -3,91 +3,65 @@
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
-if (! function_exists('process_datatable')) {
+if (!function_exists('process_datatable')) {
 
 
     /**
-     * @param Str $model_fullname full model class name. like: Spatie\Permission\Models\Role
-     * @param array $fields List of allowed fields to be queried. 
-     * @param Str $query query builder instance. 
-     * 
+     * @param string $model_fullname full model class name. like: Spatie\Permission\Models\Role
+     * @param array $fields List of allowed fields to be queried.
+     * @param Builder $query query builder instance.
+     *
      */
-    function processDataTable(Request $request, $model_fullname, array $fields=[], $query = '')
+    function processDataTable(Request $request, array $fields, $model_fullname = null, Builder $query = null): array
     {
-        if (!empty($model_fullname)) {
+        if ($model_fullname) {
             $data = new $model_fullname;
-        } elseif (!empty($query)) {
+        } elseif ($query) {
             $data = $query;
         } else {
-            return [
-                'status'  => 500,
-                'message' => 'bad method invokation.'
-            ];
+            throw new Exception('Bad Method Invocation');
         }
 
         if (!requestIsValid($request, $fields)) {
             return [
-            'status' => 403,
-            'message' => 'access to the requested resource is forbidden',
-        ];
+                'status' => 403,
+                'message' => 'access to the requested resource is forbidden',
+            ];
         }
 
-        $columns = getColumns($request);
-        
+        $columns = $request->input('columns');
         $recordsTotal = $data->count();
-        $recordsFiltered = $recordsTotal;
-
         $limit = $request->input('length');
         $start = $request->input('start');
         $order = $columns[$request->input('order.0.column')]['name']['name'];
-
-        
         $dir = $request->input('order.0.dir');
 
-        // create searchable fields array
-        $search_fields = [];
-        $is_searchable = false;
+        foreach ($columns as $key => $val) {
 
-        foreach ($columns as $key => $value) {
-            $name_array = $columns[$key]['name'];
-            $rel = null;
+            if ($request->input('columns.' . $key . '.searchable') == 'true' && $request->input('columns.' . $key . '.search.value') != null) {
 
-            if ($request->input('columns.'.$key.'.searchable') == 'true') {
-                $arr = array(
-                    'value'    => $request->input('columns.'.$key.'.search.value'),
-                    'type'     => $columns[$key]['name']['type'],
-                );
+                $field = $val['name']['name'];
+                $value = $request->input('columns.' . $key . '.search.value');
+                $type = $val['name']['type'];
 
-                $field = $columns[$key]['name']['name'];
-
-                $search_fields[$field] = $arr;
-                $is_searchable = true;
-            }
-        }
-
-        foreach ($search_fields as $field => $attributes) {
-            if (isset($attributes['value'])) {
-                $value = $attributes['value'];
-                    
-                if ($attributes['type'] == 'text') {
+                if ($type == 'text') {
                     $data = $data->where($field, 'LIKE', "%${value}%");
-                } elseif ($attributes['type'] == 'between') {
+                } elseif ($type == 'between') {
                     $date_values = explode('&', $value);
                     $date_values[0] .= " 00:00:00";
                     $date_values[1] .= " 23:59:59";
                     $data = $data->whereBetween($field, $date_values);
-                }
-                elseif($attributes['type'] == 'select'){
-                    $data = $data->where($field, "${value}");
+                } elseif ($type == 'select') {
+                    $data = $data->where($field, $value);
                 }
             }
         }
 
         $recordsFiltered = $data->count();
         $data = $data->offset($start)
-                           ->limit($limit)
-                           ->orderBy($order, $dir)
-                           ->get();
+            ->limit($limit)
+            ->orderBy($order, $dir)
+            ->get();
 
         return [
             'status' => 200,
@@ -99,38 +73,20 @@ if (! function_exists('process_datatable')) {
     }
 }
 
-if (! function_exists('getColumns')) {
-    function getColumns(Request $request)
-    {
-        $columns = [];
-        foreach ($request->columns as $col) {
-            $columns[] = $col;
-        }
-
-        return $columns;
-    }
-}
-
 if (!function_exists('requestIsValid')) {
     function requestIsValid(Request $request, array $fields)
     {
-        $columns = getColumns($request);
-        
+        $columns = $request->columns;
+
         // check column names
-        foreach ($columns as $key => $value) {
-            $colName = $columns[$key]['name']['name'];
-            $colType = $columns[$key]['name']['type'];
-            
+        foreach ($columns as $value) {
+            $colName = $value['name']['name'];
+            $colType = $value['name']['type'];
+
             // do nothing if column is optional
             if (!in_array($colName, $fields) && $colType != 'option') {
                 return false;
             }
-        }
-
-        // check order name
-        $orderName = $columns[$request->input('order.0.column')]['name']['name'];
-        if (!in_array($orderName, $fields)) {
-            return false;
         }
 
         return true;
@@ -143,7 +99,7 @@ if (!function_exists('makeSelectQuery')) {
         $select = '';
         for ($i = 0; $i < count($fields); $i++) {
             if ($aliases[$i]) {
-                $select .= $fields[$i]. ' as '. $aliases[$i];
+                $select .= $fields[$i] . ' as ' . $aliases[$i];
             } else {
                 $select .= $fields[$i];
             }
