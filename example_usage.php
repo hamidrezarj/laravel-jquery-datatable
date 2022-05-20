@@ -14,7 +14,7 @@ class UserController extends Controller
                     ->join('roles', 'model_has_roles.role_id', '=', 'roles.id')
                     ->selectRaw($select);
 
-        $results = processDataTable($request, $model_fullname=[], $fields, $query);
+        $results = processDataTable($request, $fields, query: $query);
         return response()->json($results, $results['status']);
     }
 }
